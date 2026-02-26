@@ -10,6 +10,11 @@ from dagster import asset, MetadataValue
 @asset
 def renta_raw():
     df = pd.read_csv("./data/distribucion-renta-canarias.csv", sep=",", encoding="utf-8")
+
+    # PASO 8 — FALLO CAPA CARGA: renombrar columna esperada por el check
+    # check_renta_raw_no_vacio busca "OBS_VALUE" — al renombrarla, el check falla
+    # df = df.rename(columns={"OBS_VALUE": "OBS_VALUE_RENAMED"})
+
     return df
 
 # ── ASSET 2: Carga de codislas ────────────────────────────────────────────────
@@ -40,6 +45,21 @@ def renta_limpia(renta_raw):
     # Eliminar filas sin valor
     df = df.dropna(subset=["valor"])
 
+    # PASO 8 — FALLO CAPA TRANSFORMACIÓN: inyectar valor fuera de rango
+    # check_renta_valores_porcentaje exige valores entre 0 y 100
+    '''
+    fila_sucia = pd.DataFrame({
+        "territorio": ["Municipio Ficticio"],
+        "codigo": ["99999"],
+        "anio": [df["anio"].max()],
+        "anio_code": [df["anio_code"].max()],
+        "medida": ["Sueldos y salarios"],
+        "medida_code": ["SUELDOS_SALARIOS"],
+        "valor": [999.0]   # ← fuera del rango [0, 100]
+    })
+    df = pd.concat([df, fila_sucia], ignore_index=True)
+    '''
+
     return df
 
 # ── ASSET 4: Preparar codislas para el join ───────────────────────────────────
@@ -55,6 +75,10 @@ def codislas_limpio(codislas_raw):
         "Palma, La": "La Palma",
         "Hierro, El": "El Hierro"
     })
+
+    # PASO 8 — FALLO CAPA TRANSFORMACIÓN: dejar nombre con formato incorrecto
+    # check_islas_normalizadas detecta nombres con coma (ej. "Gomera, La")
+    # df["isla"] = df["isla"].replace({"La Gomera": "Gomera, La"})
 
     return df[["codigo", "isla", "municipio"]]
 
@@ -95,6 +119,11 @@ def grafico_barras_empleo(renta_con_islas):
 
     os.makedirs("./output", exist_ok=True)
     plot.save("./output/barras_empleo.png", dpi=150)
+
+    # PASO 8 — FALLO CAPA VISUALIZACIÓN: devolver ruta incorrecta
+    # check_barras_empleo_existe busca el PNG en "./output/barras_empleo.png"
+    # return "./output/ruta_incorrecta.png"
+
     return "./output/barras_empleo.png"
 
 
@@ -148,25 +177,21 @@ def grafico_scatter_estudios_empleo(renta_con_islas, nivelestudios_raw):
     df_est["codigo"] = df_est["municipio_raw"].str[:5].str.strip()
     df_est["total"] = pd.to_numeric(df_est["total"], errors="coerce")
 
-    # Extraer universitarios y total por municipio
     df_uni = df_est[df_est["nivel_estudios"] == "No cursa estudios"].groupby("codigo")["total"].sum().reset_index()
     df_uni = df_uni.rename(columns={"total": "no_estudiantes"})
 
     df_total = df_est[df_est["nivel_estudios"] == "Total"].groupby("codigo")["total"].sum().reset_index()
     df_total = df_total.rename(columns={"total": "total_estudiantes"})
 
-    # Calcular porcentaje
     df_pct = df_uni.merge(df_total, on="codigo", how="inner")
     df_pct["pct_no_estudiantes"] = (df_pct["no_estudiantes"] / df_pct["total_estudiantes"] * 100).round(1)
 
-    # Preparar renta
     ultimo_anio = renta_con_islas["anio"].max()
     df_renta = renta_con_islas[
         (renta_con_islas["anio"] == ultimo_anio) &
         (renta_con_islas["medida_code"] == "SUELDOS_SALARIOS")
     ][["codigo", "municipio", "isla", "valor"]].dropna()
 
-    # Join
     df_joined = df_renta.merge(df_pct, on="codigo", how="inner")
 
     plot = (
@@ -187,6 +212,7 @@ def grafico_scatter_estudios_empleo(renta_con_islas, nivelestudios_raw):
     os.makedirs("./output", exist_ok=True)
     plot.save("./output/scatter_estudios_empleo.png", dpi=150)
     return "./output/scatter_estudios_empleo.png"
+
 
 @asset
 def grafico_boxplot_empleo(renta_con_islas):

@@ -1,3 +1,5 @@
+import os
+import re
 import pandas as pd
 from dagster import asset_check, AssetCheckResult, MetadataValue
 from scripts.pipeline_renta import (
@@ -11,9 +13,14 @@ from scripts.pipeline_renta import (
     grafico_barras_desempleo,
     grafico_boxplot_empleo,
     grafico_scatter_estudios_empleo,
+    grafico_mapa_municipios,
+    codigo_generado_ia,
+    visualizacion_ia,
 )
 
-# ── CHECKS DE CARGA ───────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# CHECKS DE CARGA
+# ─────────────────────────────────────────────────────────────────────────────
 
 @asset_check(asset=renta_raw)
 def check_renta_raw_no_vacio(renta_raw):
@@ -74,7 +81,9 @@ def check_nivelestudios_raw_no_vacio(nivelestudios_raw):
     )
 
 
-# ── CHECKS DE TRANSFORMACIÓN ──────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# CHECKS DE TRANSFORMACIÓN
+# ─────────────────────────────────────────────────────────────────────────────
 
 @asset_check(asset=renta_limpia)
 def check_renta_limpia_codigos(renta_limpia):
@@ -133,7 +142,6 @@ def check_renta_valores_porcentaje(renta_limpia):
             "filas_fuera_de_rango": MetadataValue.int(n_fuera),
             "min_valor": MetadataValue.float(float(renta_limpia["valor"].min())),
             "max_valor": MetadataValue.float(float(renta_limpia["valor"].max())),
-            "principio_gestalt": MetadataValue.text("Escala adecuada — eje Y entre 0 y 100"),
             "mensaje": MetadataValue.text(
                 "OK" if passed else f"{n_fuera} valores fuera del rango [0, 100]."
             ),
@@ -152,12 +160,7 @@ def check_islas_normalizadas(codislas_limpio):
         passed=passed,
         metadata={
             "islas_con_formato_incorrecto": MetadataValue.int(n_mal),
-            "ejemplos": MetadataValue.text(
-                str(islas_con_coma["isla"].unique().tolist())
-            ),
-            "principio_gestalt": MetadataValue.text(
-                "Similitud — nombres inconsistentes generan leyendas duplicadas en ggplot"
-            ),
+            "ejemplos": MetadataValue.text(str(islas_con_coma["isla"].unique().tolist())),
             "mensaje": MetadataValue.text(
                 "OK" if passed else f"Hay {n_mal} islas con formato 'Nombre, El/La'."
             ),
@@ -181,27 +184,25 @@ def check_join_cobertura(renta_con_islas):
             "pct_sin_isla": MetadataValue.float(pct_sin_isla),
             "umbral_maximo": MetadataValue.text("5%"),
             "mensaje": MetadataValue.text(
-                "OK" if passed else f"El {pct_sin_isla}% de filas no tiene isla — posible fallo en el join."
+                "OK" if passed else f"El {pct_sin_isla}% de filas no tiene isla."
             ),
         },
     )
 
 
-# ── CHECKS DE VISUALIZACIÓN ───────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# CHECKS DE VISUALIZACIÓN — gráficos originales
+# ─────────────────────────────────────────────────────────────────────────────
 
 @asset_check(asset=grafico_barras_empleo)
 def check_barras_empleo_existe(grafico_barras_empleo):
     """El archivo PNG del gráfico de empleo debe haberse generado."""
-    import os
     existe = os.path.isfile(grafico_barras_empleo)
-
     return AssetCheckResult(
         passed=existe,
         metadata={
             "ruta": MetadataValue.path(grafico_barras_empleo),
-            "mensaje": MetadataValue.text(
-                "OK" if existe else "El archivo PNG no se ha generado."
-            ),
+            "mensaje": MetadataValue.text("OK" if existe else "El PNG no se ha generado."),
         },
     )
 
@@ -209,16 +210,12 @@ def check_barras_empleo_existe(grafico_barras_empleo):
 @asset_check(asset=grafico_barras_desempleo)
 def check_barras_desempleo_existe(grafico_barras_desempleo):
     """El archivo PNG del gráfico de desempleo debe haberse generado."""
-    import os
     existe = os.path.isfile(grafico_barras_desempleo)
-
     return AssetCheckResult(
         passed=existe,
         metadata={
             "ruta": MetadataValue.path(grafico_barras_desempleo),
-            "mensaje": MetadataValue.text(
-                "OK" if existe else "El archivo PNG no se ha generado."
-            ),
+            "mensaje": MetadataValue.text("OK" if existe else "El PNG no se ha generado."),
         },
     )
 
@@ -226,16 +223,12 @@ def check_barras_desempleo_existe(grafico_barras_desempleo):
 @asset_check(asset=grafico_boxplot_empleo)
 def check_boxplot_empleo_existe(grafico_boxplot_empleo):
     """El archivo PNG del boxplot debe haberse generado."""
-    import os
     existe = os.path.isfile(grafico_boxplot_empleo)
-
     return AssetCheckResult(
         passed=existe,
         metadata={
             "ruta": MetadataValue.path(grafico_boxplot_empleo),
-            "mensaje": MetadataValue.text(
-                "OK" if existe else "El archivo PNG no se ha generado."
-            ),
+            "mensaje": MetadataValue.text("OK" if existe else "El PNG no se ha generado."),
         },
     )
 
@@ -243,15 +236,95 @@ def check_boxplot_empleo_existe(grafico_boxplot_empleo):
 @asset_check(asset=grafico_scatter_estudios_empleo)
 def check_scatter_existe(grafico_scatter_estudios_empleo):
     """El archivo PNG del scatter debe haberse generado."""
-    import os
     existe = os.path.isfile(grafico_scatter_estudios_empleo)
-
     return AssetCheckResult(
         passed=existe,
         metadata={
             "ruta": MetadataValue.path(grafico_scatter_estudios_empleo),
+            "mensaje": MetadataValue.text("OK" if existe else "El PNG no se ha generado."),
+        },
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CHECKS NUEVOS — práctica 4
+# ─────────────────────────────────────────────────────────────────────────────
+
+@asset_check(asset=grafico_mapa_municipios)
+def check_mapa_municipios_existe(grafico_mapa_municipios):
+    """El mapa coroplético de municipios debe haberse generado correctamente."""
+    existe = os.path.isfile(grafico_mapa_municipios)
+    tamanio_bytes = os.path.getsize(grafico_mapa_municipios) if existe else 0
+    # Un PNG válido de un mapa debe pesar al menos 50 KB
+    tamanio_ok = tamanio_bytes > 50_000
+    passed = existe and tamanio_ok
+
+    return AssetCheckResult(
+        passed=passed,
+        metadata={
+            "ruta": MetadataValue.path(grafico_mapa_municipios),
+            "tamanio_bytes": MetadataValue.int(tamanio_bytes),
             "mensaje": MetadataValue.text(
-                "OK" if existe else "El archivo PNG no se ha generado."
+                "OK" if passed
+                else f"Archivo inexistente o demasiado pequeño ({tamanio_bytes} bytes)."
+            ),
+        },
+    )
+
+
+@asset_check(asset=codigo_generado_ia)
+def check_codigo_ia_valido(codigo_generado_ia):
+    """
+    El código generado por el LLM debe:
+    1. Contener la función 'generar_plot'.
+    2. No tener bloques markdown residuales.
+    3. Ser compilable (sintaxis Python válida).
+    """
+    tiene_funcion = "def generar_plot" in codigo_generado_ia
+    sin_markdown = "```" not in codigo_generado_ia
+
+    sintaxis_ok = False
+    error_sintaxis = ""
+    try:
+        compile(codigo_generado_ia, "<llm_output>", "exec")
+        sintaxis_ok = True
+    except SyntaxError as e:
+        error_sintaxis = str(e)
+
+    passed = tiene_funcion and sin_markdown and sintaxis_ok
+
+    return AssetCheckResult(
+        passed=passed,
+        metadata={
+            "tiene_funcion_generar_plot": MetadataValue.bool(tiene_funcion),
+            "sin_markdown_residual": MetadataValue.bool(sin_markdown),
+            "sintaxis_python_valida": MetadataValue.bool(sintaxis_ok),
+            "error_sintaxis": MetadataValue.text(error_sintaxis or "ninguno"),
+            "longitud_codigo": MetadataValue.int(len(codigo_generado_ia)),
+            "mensaje": MetadataValue.text(
+                "OK" if passed
+                else "El código generado por el LLM no cumple los requisitos mínimos."
+            ),
+        },
+    )
+
+
+@asset_check(asset=visualizacion_ia)
+def check_visualizacion_ia_existe(visualizacion_ia):
+    """El PNG generado por el código de la IA debe existir y tener tamaño razonable."""
+    existe = os.path.isfile(visualizacion_ia)
+    tamanio_bytes = os.path.getsize(visualizacion_ia) if existe else 0
+    tamanio_ok = tamanio_bytes > 10_000  # > 10 KB
+    passed = existe and tamanio_ok
+
+    return AssetCheckResult(
+        passed=passed,
+        metadata={
+            "ruta": MetadataValue.path(visualizacion_ia),
+            "tamanio_bytes": MetadataValue.int(tamanio_bytes),
+            "mensaje": MetadataValue.text(
+                "OK" if passed
+                else f"PNG inexistente o vacío ({tamanio_bytes} bytes)."
             ),
         },
     )

@@ -58,36 +58,6 @@ def viz_renta_por_zona(renta_por_zona: pd.DataFrame) -> str:
     return path
 
 
-@asset(group_name="viz", description="Acto 1 – Distribución fuentes de renta 2019 por zona (barras apiladas, año base pre-volcán)")
-def viz_distribucion_renta_2021(distribucion_por_zona: pd.DataFrame) -> str:
-    df = distribucion_por_zona[distribucion_por_zona["año"] == 2019].copy()
-    df["zona"] = pd.Categorical(
-        df["zona"],
-        categories=["Zona volcán", "La Palma (resto)", "Resto provincia"],
-        ordered=True,
-    )
-    p = (
-        ggplot(df, aes(x="zona", y="pct", fill="fuente"))
-        + geom_col(position="stack", width=0.6)
-        + scale_fill_brewer(type="qual", palette="Set2", name="Fuente de renta")
-        + coord_flip()
-        + labs(
-            title="Distribución de fuentes de renta · 2019 (año base pre-volcán)",
-            subtitle="% de la renta total procedente de cada fuente, por zona  |  Rentas ejercicio 2018",
-            x="", y="% sobre renta total",
-            caption="Fuente: ISTAC – E30325A_000002",
-        )
-        + theme_minimal()
-        + theme(
-            plot_title=element_text(size=13, face="bold"),
-            legend_position="bottom",
-        )
-    )
-    path = f"{OUTPUT_DIR}/viz_02_dist_renta_2021.png"
-    p.save(path, dpi=150, width=10, height=5)
-    return path
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # ACTO 2 – El golpe
 # ─────────────────────────────────────────────────────────────────────────────
@@ -212,7 +182,7 @@ def viz_desempleo_evolucion(distribucion_por_zona: pd.DataFrame) -> str:
             title="% de renta procedente de prestaciones por desempleo · 2019-2023",
             subtitle="Evolución pre y post volcán Tajogaite",
             x="Año", y="% sobre renta total",
-            caption="Fuente: ISTAC – E30325A_000002  |  Volcán sept. 2021: impacto en prestaciones visible en fichero 2021",
+            caption="Fuente: ISTAC – E30325A_000002  |  Volcán sept. 2021: impacto en prestaciones",
         )
         + theme_minimal()
         + theme(
@@ -223,45 +193,6 @@ def viz_desempleo_evolucion(distribucion_por_zona: pd.DataFrame) -> str:
     )
     path = f"{OUTPUT_DIR}/viz_05_desempleo_evolucion.png"
     p.save(path, dpi=150, width=10, height=5)
-    return path
-
-
-@asset(group_name="viz", description="Acto 3 – Calidad de ocupación zona volcán 2021-2023 (barras apiladas)")
-def viz_ocupacion_calidad(ocupacion_calidad_volcan: pd.DataFrame) -> str:
-    df = ocupacion_calidad_volcan[ocupacion_calidad_volcan["tipo_ocup"] != "No consta"].copy()
-    df["tipo_ocup"] = pd.Categorical(
-        df["tipo_ocup"],
-        categories=["Cualificada", "Semi-cualificada", "Elemental"],
-        ordered=True,
-    )
-    p = (
-        ggplot(df, aes(x="municipio", y="pct", fill="tipo_ocup"))
-        + geom_col(position="stack", width=0.65)
-        + facet_wrap("~año", ncol=3)
-        + scale_fill_manual(
-            values={
-                "Cualificada":      "#1D3557",
-                "Semi-cualificada": "#457B9D",
-                "Elemental":        "#E63946",
-            },
-            name="Tipo de ocupación",
-        )
-        + coord_flip()
-        + labs(
-            title="Calidad de la ocupación en la zona volcán · 2021-2023",
-            subtitle="% de trabajadores por categoría de ocupación (hombres + mujeres)",
-            x="", y="% sobre total",
-            caption="Fuente: INE – Censo de Población y Viviendas",
-        )
-        + theme_minimal()
-        + theme(
-            plot_title=element_text(size=13, face="bold"),
-            strip_background=element_rect(fill="#F0F0F0"),
-            legend_position="bottom",
-        )
-    )
-    path = f"{OUTPUT_DIR}/viz_06_ocupacion_calidad.png"
-    p.save(path, dpi=150, width=12, height=6)
     return path
 
 
@@ -354,47 +285,6 @@ def viz_tasa_paro(tasa_paro_zona: pd.DataFrame) -> str:
     )
     path = f"{OUTPUT_DIR}/viz_09_tasa_paro.png"
     p.save(path, dpi=150, width=9, height=5)
-    return path
-
-
-@asset(group_name="viz", description="Acto 4 – Composición de actividad en zona volcán 2021-2024 (barras apiladas)")
-def viz_composicion_actividad(relacion_actividad_clean: pd.DataFrame) -> str:
-    df = relacion_actividad_clean[
-        (relacion_actividad_clean["zona"] == "Zona volcán")
-        & (relacion_actividad_clean["pais_nacimiento"] == "Total")
-        & (relacion_actividad_clean["relacion"] != "Total")
-    ].copy()
-    agg = df.groupby(["año", "relacion"])["num_casos"].sum().reset_index()
-    total = agg.groupby("año")["num_casos"].transform("sum")
-    agg["pct"] = (agg["num_casos"] / total * 100).round(1)
-    agg["año"] = agg["año"].astype(str)
-    labels = {
-        "Ocupado/a": "Ocupado/a",
-        "Parado/a": "Parado/a",
-        "Perceptor/a pensión de incapacidad, jubilación, prejubilación": "Pensionista/Jubilado",
-        "Otra situación de inactividad": "Otra inactividad",
-        "Estudiante": "Estudiante",
-    }
-    agg["relacion_label"] = agg["relacion"].map(labels).fillna(agg["relacion"])
-    p = (
-        ggplot(agg, aes(x="año", y="pct", fill="relacion_label"))
-        + geom_col(position="stack", width=0.6)
-        + scale_fill_brewer(type="qual", palette="Set2", name="Relación actividad")
-        + labs(
-            title="Composición de la actividad · Zona volcán · 2021-2024",
-            subtitle="El Paso · Tazacorte · Los Llanos de Aridane  |  INE tabla 66796",
-            x="Año", y="% sobre población 16+",
-            caption="Fuente: INE – Censo Anual de Población",
-        )
-        + theme_minimal()
-        + theme(
-            plot_title=element_text(size=13, face="bold"),
-            plot_subtitle=element_text(size=10, color="#555555"),
-            legend_position="right",
-        )
-    )
-    path = f"{OUTPUT_DIR}/viz_10_composicion_actividad.png"
-    p.save(path, dpi=150, width=10, height=6)
     return path
 
 

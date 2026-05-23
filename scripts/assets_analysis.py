@@ -58,21 +58,26 @@ def actividad_zona_volcan(actividad_clean: pd.DataFrame) -> pd.DataFrame:
 
 
 @asset(group_name="analysis",
-       description="Acto 2: Construcción post-volcán — cambio porcentual en zona volcán vs La Palma resto")
+       description="Acto 2: Construcción post-volcán — índice por municipio de La Palma (base 2021=100)")
 def construccion_comparada(actividad_clean: pd.DataFrame) -> pd.DataFrame:
     df = actividad_clean[
-        (actividad_clean["zona"].isin(["Zona volcán", "La Palma (resto)"]))
+        (actividad_clean["es_lapalma"])
         & (actividad_clean["actividad"] == "Construcción")
     ].copy()
+
     agg = (
-        df.groupby(["año", "zona"])["num_casos"]
+        df.groupby(["año", "municipio", "zona"])["num_casos"]
         .sum()
         .reset_index()
     )
-    # Índice base 2021 = 100
-    base = agg[agg["año"] == 2021].set_index("zona")["num_casos"]
+
+    # Índice base 2021 = 100 por municipio
+    base = agg[agg["año"] == 2021].set_index("municipio")["num_casos"]
+    # Solo municipios que tienen datos en 2021
+    municipios_validos = base[base > 0].index
+    agg = agg[agg["municipio"].isin(municipios_validos)].copy()
     agg["indice"] = agg.apply(
-        lambda r: round(r["num_casos"] / base[r["zona"]] * 100, 1), axis=1
+        lambda r: round(r["num_casos"] / base[r["municipio"]] * 100, 1), axis=1
     )
     return agg
 

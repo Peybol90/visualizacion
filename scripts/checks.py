@@ -15,8 +15,8 @@ from scripts.assets_clean import (
     ocupacion_clean, actividad_clean, rentamedia_clean, distribucion_clean,
 )
 from scripts.assets_viz import (
-    viz_renta_por_zona, viz_distribucion_renta_2021, viz_actividad_zona_volcan,
-    viz_construccion_indice, viz_desempleo_evolucion, viz_ocupacion_calidad,
+    viz_renta_por_zona, viz_actividad_zona_volcan,
+    viz_construccion_indice, viz_desempleo_evolucion,
     viz_renta_recuperacion, viz_distribucion_volcan_cambio,
 )
 from scripts.assets_maps import (
@@ -69,17 +69,21 @@ def check_rentamedia_raw_no_vacio(rentamedia_raw: pd.DataFrame) -> AssetCheckRes
 
 @asset_check(asset=distribucion_raw)
 def check_distribucion_raw_no_vacio(distribucion_raw: pd.DataFrame) -> AssetCheckResult:
-    cols_esperadas = {"año", "MEDIDAS_CODE", "OBS_VALUE", "TERRITORIO_CODE"}
+    # Nuevo formato ISTAC: columnas TERRITORIO_CODE, MEDIDAS_CODE, OBS_VALUE, año_dato
+    cols_esperadas = {"TERRITORIO_CODE", "MEDIDAS_CODE", "OBS_VALUE", "año_dato"}
     presentes = cols_esperadas.issubset(set(distribucion_raw.columns))
-    # OBS_VALUE debe ser string (comas decimales) – si ya es float algo falló upstream
-    tipo_correcto = bool(distribucion_raw["OBS_VALUE"].dtype == object)
-    passed = bool(len(distribucion_raw) > 0 and presentes and tipo_correcto)
+    # OBS_VALUE ahora es float64 (nuevo formato sin comas decimales)
+    tipo_correcto = bool(distribucion_raw["OBS_VALUE"].dtype in ["float64", "float32"])
+    # Debe tener los 5 años
+    años_ok = bool(set(distribucion_raw["año_dato"].unique()) >= {2019, 2020, 2021, 2022, 2023})
+    passed = bool(len(distribucion_raw) > 0 and presentes and tipo_correcto and años_ok)
     return AssetCheckResult(
         passed=passed,
         metadata={
             "filas": int(len(distribucion_raw)),
             "columnas_ok": bool(presentes),
-            "obs_value_es_string": bool(tipo_correcto),
+            "obs_value_es_float": bool(tipo_correcto),
+            "años_completos": bool(años_ok),
         },
     )
 
@@ -178,11 +182,6 @@ def check_viz_renta_zona(viz_renta_por_zona: str) -> AssetCheckResult:
     return _png_result(viz_renta_por_zona)
 
 
-@asset_check(asset=viz_distribucion_renta_2021)
-def check_viz_dist_2021(viz_distribucion_renta_2021: str) -> AssetCheckResult:
-    return _png_result(viz_distribucion_renta_2021)
-
-
 @asset_check(asset=viz_actividad_zona_volcan)
 def check_viz_actividad_volcan(viz_actividad_zona_volcan: str) -> AssetCheckResult:
     return _png_result(viz_actividad_zona_volcan)
@@ -196,11 +195,6 @@ def check_viz_construccion(viz_construccion_indice: str) -> AssetCheckResult:
 @asset_check(asset=viz_desempleo_evolucion)
 def check_viz_desempleo(viz_desempleo_evolucion: str) -> AssetCheckResult:
     return _png_result(viz_desempleo_evolucion)
-
-
-@asset_check(asset=viz_ocupacion_calidad)
-def check_viz_ocupacion(viz_ocupacion_calidad: str) -> AssetCheckResult:
-    return _png_result(viz_ocupacion_calidad)
 
 
 @asset_check(asset=viz_renta_recuperacion)

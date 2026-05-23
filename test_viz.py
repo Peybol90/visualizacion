@@ -25,17 +25,14 @@ dist_z    = distribucion_por_zona(dist_c)
 act_vz    = actividad_zona_volcan(act_c)
 const_c   = construccion_comparada(act_c)
 desemp    = desempleo_seccion_volcan(dist_c)
-ocup_cal  = ocupacion_calidad_volcan(ocu_c)
 renta_idx = renta_indice_recuperacion(renta_z)
 
 # Viz - una a una para localizar errores
 vizs = [
     ("viz_01", lambda: viz_renta_por_zona(renta_z)),
-    ("viz_02", lambda: viz_distribucion_renta_2021(dist_z)),
     ("viz_03", lambda: viz_actividad_zona_volcan(act_vz)),
     ("viz_04", lambda: viz_construccion_indice(const_c)),
     ("viz_05", lambda: viz_desempleo_evolucion(dist_z)),
-    ("viz_06", lambda: viz_ocupacion_calidad(ocup_cal)),
     ("viz_07", lambda: viz_renta_recuperacion(renta_idx)),
     ("viz_08", lambda: viz_distribucion_volcan_cambio(dist_z)),
 ]

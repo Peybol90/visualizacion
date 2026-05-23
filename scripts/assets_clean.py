@@ -14,7 +14,7 @@ LA_PALMA_CODES = {
 }
 
 # Municipios directamente afectados por el volcán Tajogaite
-ZONA_VOLCAN_CODES = {38027, 38045, 38053}  # El Paso, Tazacorte, Villa de Mazo
+ZONA_VOLCAN_CODES = {38027, 38045, 38024}  # El Paso, Tazacorte, Los Llanos de Aridane
 
 # Municipio vecino/receptor principal de desplazados
 ZONA_PALMA_RESTO = LA_PALMA_CODES - ZONA_VOLCAN_CODES
@@ -56,7 +56,7 @@ def actividad_clean(actividad_raw: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-@asset(group_name="clean", description="Renta media limpia: espacios en municipio, regla de desfase GeoJSON")
+@asset(group_name="clean", description="Renta media limpia: espacios en municipio")
 def rentamedia_clean(rentamedia_raw: pd.DataFrame) -> pd.DataFrame:
     df = rentamedia_raw.copy()
     df["municipio"] = df["municipio"].str.strip()
@@ -154,7 +154,7 @@ _NOMBRE_MUN_LA_PALMA = {
     "Santa Cruz de La Palma", "Tazacorte", "Tijarafe", "Villa de Mazo",
 }
 _NOMBRE_ZONA_VOLCAN = {
-    "Paso, El", "El Paso", "Tazacorte", "Villa de Mazo"
+    "Paso, El", "El Paso", "Tazacorte", "Los Llanos de Aridane", "Llanos de Aridane, Los"
 }
 
 

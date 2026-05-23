@@ -33,7 +33,7 @@ def distribucion_raw() -> pd.DataFrame:
     for anyo in [2019, 2020, 2021, 2022, 2023]:
         path = f"{DATA_DIR}/distribucion-renta-{anyo}.csv"
         df = pd.read_csv(path)
-        df["año_dato"] = anyo  # año del dato = año del ejercicio fiscal (sin desfase)
+        df["año_dato"] = anyo  # año del dato = año del ejercicio fiscal
         dfs.append(df)
     return pd.concat(dfs, ignore_index=True)
 

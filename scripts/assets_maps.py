@@ -82,7 +82,7 @@ def mapa_renta_lapalma_2022(rentamedia_clean: pd.DataFrame) -> str:
     ].copy()
     df["geocode_join"] = df["geocode_join"].astype(str)
 
-    # Un GeoDataFrame por año con su GeoJSON correspondiente (regla desfase)
+    # Un GeoDataFrame por año con su GeoJSON correspondiente
     gdfs = []
     for anyo in AÑOS:
         geo_prefix = GEO_AÑO_SIGUIENTE[anyo]
@@ -132,7 +132,6 @@ def mapa_desempleo_volcan_2022(desempleo_seccion_lapalma: pd.DataFrame) -> str:
     df = desempleo_seccion_lapalma.copy()
     df["TERRITORIO_CODE"] = df["TERRITORIO_CODE"].astype(str)
 
-    # Regla desfase: datos año N → GeoJSON año N+1
     AÑOS_5 = [2019, 2020, 2021, 2022, 2023]
     gdfs = []
     for anyo in AÑOS_5:
@@ -159,7 +158,7 @@ def mapa_desempleo_volcan_2022(desempleo_seccion_lapalma: pd.DataFrame) -> str:
         + labs(
             title="Prestaciones de desempleo · La Palma · 2019-2023",
             subtitle="Evolución pre y post volcán Tajogaite (sept. 2021)  |  ISTAC E30325A_000002",
-            caption="Secciones grises: dato no disponible  |  Sin desfase: etiqueta N = rentas ejercicio N",
+            caption="Secciones grises: dato no disponible",
         )
         + theme_void()
         + theme(
@@ -348,7 +347,7 @@ def mapa_desempleo_tenerife(distribucion_clean: pd.DataFrame) -> str:
         + labs(
             title="Prestaciones de desempleo · Tenerife · 2019-2023",
             subtitle="Contexto provincial  |  ISTAC E30325A_000002",
-            caption="Secciones grises: dato no disponible  |  Sin desfase: etiqueta N = rentas ejercicio N",
+            caption="Secciones grises: dato no disponible",
         )
         + theme_void()
         + theme(

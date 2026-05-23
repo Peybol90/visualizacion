@@ -11,7 +11,7 @@ from plotnine import (
     ggplot, aes, geom_col, geom_line, geom_point, geom_boxplot,
     geom_hline, geom_text, facet_wrap,
     scale_fill_manual, scale_color_manual, scale_x_continuous,
-    scale_y_continuous, coord_flip, theme_minimal, theme, labs,
+    scale_y_continuous, scale_size_identity, coord_flip, theme_minimal, theme, labs,
     element_text, element_blank, element_rect,
     position_dodge,
 )
@@ -106,7 +106,7 @@ def viz_actividad_zona_volcan(actividad_zona_volcan: pd.DataFrame) -> str:
         + coord_flip()
         + labs(
             title="Distribución de la actividad económica · Zona volcán",
-            subtitle="El Paso · Tazacorte · Villa de Mazo  (% sobre total trabajadores)",
+            subtitle="El Paso · Tazacorte · Los Llanos de Aridane  (% sobre total trabajadores)",
             x="", y="% sobre total",
             caption="Fuente: INE – Censo de Población y Viviendas",
         )
@@ -118,19 +118,60 @@ def viz_actividad_zona_volcan(actividad_zona_volcan: pd.DataFrame) -> str:
     return path
 
 
-@asset(group_name="viz", description="Acto 2 – Índice de construcción (base 2021=100) zona volcán vs La Palma")
+@asset(group_name="viz", description="Acto 2 – Índice de construcción por municipio de La Palma (base 2021=100)")
 def viz_construccion_indice(construccion_comparada: pd.DataFrame) -> str:
+    import matplotlib.pyplot as plt
+    import matplotlib.colors as mcolors
+
+    df = construccion_comparada.copy()
+    muns_volcan = ["Paso, El", "Tazacorte", "Llanos de Aridane, Los"]
+
+    # Identificar top 3 municipios por índice en 2023
+    top3_2023 = (
+        df[df["año"] == 2023]
+        .nlargest(3, "indice")["municipio"]
+        .tolist()
+    )
+
+    # Etiquetas solo en 2023 para top3 y municipios volcán
+    etiquetar = set(top3_2023 + muns_volcan)
+    df_labels = df[(df["año"] == 2023) & (df["municipio"].isin(etiquetar))].copy()
+
+    # Paleta: volcán=rojos, top3=naranja, resto=azul claro uniforme
+    muns_resto = sorted([m for m in df["municipio"].unique() if m not in muns_volcan])
+    paleta = {m: "#B0C4DE" for m in muns_resto}  # azul claro uniforme para el fondo
+    for m in top3_2023:
+        if m not in muns_volcan:
+            paleta[m] = "#F4A261"  # naranja para top3 no volcán
+    paleta.update({
+        "Paso, El":     "#E63946",
+        "Tazacorte":    "#C1121F",
+        "Llanos de Aridane, Los": "#FF6B6B",
+    })
+
+    # Grosor: destacar top3 y volcán
+    df["grosor"] = df["municipio"].apply(
+        lambda m: 1.8 if m in etiquetar else 0.6
+    )
+
     p = (
-        ggplot(construccion_comparada, aes(x="año", y="indice", color="zona", group="zona"))
-        + geom_hline(yintercept=100, linetype="dashed", color="#999999", size=0.8)
-        + geom_line(size=1.3)
-        + geom_point(size=4)
-        + geom_text(aes(label="indice"), nudge_y=3, size=8, color="#222222")
-        + scale_color_manual(values=PALETA_ZONA, name="Zona")
-        + scale_x_continuous(breaks=[2021, 2022, 2023])
+        ggplot(df, aes(x="año", y="indice", color="municipio", group="municipio",
+                       size="grosor"))
+        + geom_hline(yintercept=100, linetype="dashed", color="#AAAAAA", size=0.8)
+        + geom_line()
+        + geom_point(data=df[df["municipio"].isin(etiquetar)], size=3)
+        + geom_text(
+            data=df_labels,
+            mapping=aes(label="municipio"),
+            nudge_x=0.05, nudge_y=1.5,
+            size=7, ha="left",
+        )
+        + scale_color_manual(values=paleta)
+        + scale_size_identity()
+        + scale_x_continuous(breaks=[2021, 2022, 2023], limits=[2020.8, 2023.8])
         + labs(
-            title="Recuperación del sector construcción · Índice 2021 = 100",
-            subtitle="La reconstrucción post-volcán impulsa la construcción en la zona afectada",
+            title="Sector construcción por municipio · La Palma · Índice 2021 = 100",
+            subtitle="Top 3 en naranja · Zona volcán en rojo · Resto en azul",
             x="Año", y="Índice (2021 = 100)",
             caption="Fuente: INE – Censo de Población y Viviendas",
         )
@@ -138,11 +179,11 @@ def viz_construccion_indice(construccion_comparada: pd.DataFrame) -> str:
         + theme(
             plot_title=element_text(size=13, face="bold"),
             plot_subtitle=element_text(size=10, color="#555555"),
-            legend_position="bottom",
+            legend_position="none",
         )
     )
     path = f"{OUTPUT_DIR}/viz_04_construccion_indice.png"
-    p.save(path, dpi=150, width=9, height=5)
+    p.save(path, dpi=150, width=11, height=6)
     return path
 
 
@@ -169,9 +210,9 @@ def viz_desempleo_evolucion(distribucion_por_zona: pd.DataFrame) -> str:
         + scale_x_continuous(breaks=[2019, 2020, 2021, 2022, 2023])
         + labs(
             title="% de renta procedente de prestaciones por desempleo · 2019-2023",
-            subtitle="Impacto del volcán Tajogaite (sept. 2021) en la dependencia de prestaciones",
+            subtitle="Evolución pre y post volcán Tajogaite",
             x="Año", y="% sobre renta total",
-            caption="Fuente: ISTAC – E30325A_000002  |  Datos a año vencido (2021 = rentas 2020)",
+            caption="Fuente: ISTAC – E30325A_000002  |  Volcán sept. 2021: impacto en prestaciones visible en fichero 2021",
         )
         + theme_minimal()
         + theme(
@@ -276,7 +317,7 @@ def viz_distribucion_volcan_cambio(distribucion_por_zona: pd.DataFrame) -> str:
             title="Fuentes de renta en la zona volcán: 2019 vs 2023",
             subtitle="Rentas 2018 (pre-volcán) vs rentas 2022 (post-volcán)",
             x="", y="% sobre renta total",
-            caption="Fuente: ISTAC – E30325A_000002  |  Datos a año vencido",
+            caption="Fuente: ISTAC – E30325A_000002  |  2019=pre-volcán, 2021=año volcán, 2023=post-volcán",
         )
         + theme_minimal()
         + theme(
@@ -341,7 +382,7 @@ def viz_composicion_actividad(relacion_actividad_clean: pd.DataFrame) -> str:
         + scale_fill_brewer(type="qual", palette="Set2", name="Relación actividad")
         + labs(
             title="Composición de la actividad · Zona volcán · 2021-2024",
-            subtitle="El Paso · Tazacorte · Villa de Mazo  |  INE tabla 66796",
+            subtitle="El Paso · Tazacorte · Los Llanos de Aridane  |  INE tabla 66796",
             x="Año", y="% sobre población 16+",
             caption="Fuente: INE – Censo Anual de Población",
         )

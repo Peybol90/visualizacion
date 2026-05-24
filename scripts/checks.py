@@ -6,6 +6,7 @@ para evitar errores de serialización de numpy en Dagster.
 
 import os
 import pandas as pd
+import geopandas as gpd
 from dagster import asset_check, AssetCheckResult
 
 from scripts.assets_raw import (
@@ -14,7 +15,7 @@ from scripts.assets_raw import (
 )
 from scripts.assets_clean import (
     ocupacion_clean, actividad_clean, rentamedia_clean, distribucion_clean,
-    relacion_actividad_clean,
+    relacion_actividad_clean, tajogaite_coladas_clean,
 )
 from scripts.assets_viz import (
     viz_renta_por_zona, viz_actividad_zona_volcan,
@@ -31,6 +32,21 @@ OUTPUT_DIR = "./output"
 # ─────────────────────────────────────────────────────────────────────────────
 # CAPA 1 – Carga (raw)
 # ─────────────────────────────────────────────────────────────────────────────
+
+@asset_check(asset=tajogaite_coladas_clean)
+def check_coladas_poligono_final(tajogaite_coladas_clean: gpd.GeoDataFrame) -> AssetCheckResult:
+    n = len(tajogaite_coladas_clean)
+    es_poligono = tajogaite_coladas_clean.geom_type.isin(["Polygon", "MultiPolygon"]).all()
+    epsg_ok = tajogaite_coladas_clean.crs.to_epsg() == 4326
+    passed = n == 1 and es_poligono and epsg_ok
+    return AssetCheckResult(
+        passed=passed,
+        metadata={
+            "n_poligonos": n,
+            "geometria_correcta": bool(es_poligono),
+            "crs_epsg4326": bool(epsg_ok),
+        },
+    )
 
 @asset_check(asset=ocupacion_raw)
 def check_ocupacion_raw_no_vacio(ocupacion_raw: pd.DataFrame) -> AssetCheckResult:

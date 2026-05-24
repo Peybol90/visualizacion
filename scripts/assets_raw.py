@@ -5,8 +5,14 @@ Cada asset lee un CSV sin transformar nada.
 
 import pandas as pd
 from dagster import asset, MetadataValue
+import geopandas as gpd
 
 DATA_DIR = "./data/raw"
+
+
+@asset(group_name="raw", description="Coladas lávicas Tajogaite – Copernicus EMSR546 capa 4 (IGME)")
+def tajogaite_coladas_raw() -> gpd.GeoDataFrame:
+    return gpd.read_file("data/raw/tajogaite_coladas.geojson").to_crs(epsg=4326)
 
 
 @asset(group_name="raw", description="Carga bruta del CSV de sector de ocupación por sección")

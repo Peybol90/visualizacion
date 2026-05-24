@@ -6,6 +6,7 @@ No imputa: los NaN de num_casos en actividad se eliminan.
 
 import pandas as pd
 from dagster import asset
+import geopandas as gpd
 
 # Municipios de La Palma (códigos INE)
 LA_PALMA_CODES = {
@@ -27,6 +28,13 @@ def _clasificar_zona(code: int) -> str:
         return "La Palma (resto)"
     else:
         return "Resto provincia"
+
+
+@asset(group_name="clean", description="Colada Tajogaite: solo perímetro final (13/12/2021)")
+def tajogaite_coladas_clean(tajogaite_coladas_raw: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    colada_final = tajogaite_coladas_raw[tajogaite_coladas_raw["orden"] == 63].copy()
+    assert len(colada_final) == 1
+    return colada_final.to_crs(epsg=4326)
 
 
 @asset(group_name="clean", description="Ocupación limpia: tipos correctos, columna zona_volcán")
@@ -162,3 +170,4 @@ def _clasificar_zona_nombre(nombre: str) -> str:
         return "La Palma (resto)"
     else:
         return "Resto provincia"
+

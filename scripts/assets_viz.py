@@ -105,7 +105,6 @@ def viz_construccion_indice(construccion_comparada: pd.DataFrame) -> str:
     p = (
         ggplot(construccion_comparada,
                aes(x="año", y="indice", color="zona", group="zona"))
-        + geom_hline(yintercept=100, linetype="dashed", color="#AAAAAA", size=0.8)
         + geom_line(size=1.3)
         + geom_point(size=4)
         + geom_text(aes(label="indice"), nudge_y=2.5, size=8, color="#222222")
@@ -218,7 +217,7 @@ def viz_distribucion_volcan_cambio(distribucion_por_zona: pd.DataFrame) -> str:
         + coord_flip()
         + labs(
             title="Fuentes de renta en la zona volcán: 2019 vs 2023",
-            subtitle="Rentas 2018 (pre-volcán) vs rentas 2022 (post-volcán)",
+            subtitle="Rentas 2019 (pre-volcán) vs rentas 2023 (post-volcán)",
             x="", y="% sobre renta total",
             caption="Fuente: ISTAC – E30325A_000002",
         )

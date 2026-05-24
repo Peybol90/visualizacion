@@ -10,9 +10,11 @@ from dagster import asset_check, AssetCheckResult
 
 from scripts.assets_raw import (
     ocupacion_raw, actividad_raw, rentamedia_raw, distribucion_raw,
+    relacion_actividad_raw,
 )
 from scripts.assets_clean import (
     ocupacion_clean, actividad_clean, rentamedia_clean, distribucion_clean,
+    relacion_actividad_clean,
 )
 from scripts.assets_viz import (
     viz_renta_por_zona, viz_actividad_zona_volcan,
@@ -88,6 +90,27 @@ def check_distribucion_raw_no_vacio(distribucion_raw: pd.DataFrame) -> AssetChec
     )
 
 
+@asset_check(asset=relacion_actividad_raw)
+def check_relacion_actividad_raw_no_vacio(relacion_actividad_raw: pd.DataFrame) -> AssetCheckResult:
+    """Verifica columnas clave, años 2021-2024 y que hay filas de sección."""
+    cols_esperadas = {"Provincias", "Municipios", "Secciones",
+                      "País de nacimiento", "Relación con la actividad", "Periodo", "Total"}
+    presentes = cols_esperadas.issubset(set(relacion_actividad_raw.columns))
+    años_ok = bool(set(relacion_actividad_raw["Periodo"].unique()) >= {2021, 2022, 2023, 2024})
+    filas_seccion = int((relacion_actividad_raw["Secciones"].notna() &
+                         (relacion_actividad_raw["Secciones"] != "")).sum())
+    passed = bool(len(relacion_actividad_raw) > 0 and presentes and años_ok and filas_seccion > 0)
+    return AssetCheckResult(
+        passed=passed,
+        metadata={
+            "filas": int(len(relacion_actividad_raw)),
+            "filas_con_seccion": filas_seccion,
+            "columnas_ok": bool(presentes),
+            "años_completos": bool(años_ok),
+        },
+    )
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # CAPA 2 – Transformación (clean)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -104,6 +127,49 @@ def check_actividad_sin_nulos(actividad_clean: pd.DataFrame) -> AssetCheckResult
     nulos = int(actividad_clean[["año", "geocode", "num_casos", "zona"]].isnull().sum().sum())
     passed = bool(nulos == 0)
     return AssetCheckResult(passed=passed, metadata={"nulos_clave": nulos})
+
+
+@asset_check(asset=rentamedia_clean)
+def check_rentamedia_sin_nulos(rentamedia_clean: pd.DataFrame) -> AssetCheckResult:
+    """
+    OBS_VALUE puede tener NaN por confidencialidad estadística del ISTAC
+    (secciones con pocos hogares). Se permite hasta un 5% de nulos.
+    """
+    total = len(rentamedia_clean)
+    nulos = int(rentamedia_clean["OBS_VALUE"].isna().sum())
+    pct_nulos = round(nulos / total * 100, 1) if total > 0 else 0
+    # Nulos en año, geocode_join y zona nunca deben existir
+    nulos_clave = int(rentamedia_clean[["año", "geocode_join", "zona"]].isnull().sum().sum())
+    passed = bool(nulos_clave == 0 and pct_nulos <= 5.0)
+    return AssetCheckResult(
+        passed=passed,
+        metadata={
+            "nulos_obs_value": nulos,
+            "pct_nulos_obs_value": float(pct_nulos),
+            "nulos_columnas_clave": nulos_clave,
+        },
+    )
+
+
+@asset_check(asset=relacion_actividad_clean)
+def check_relacion_actividad_clean(relacion_actividad_clean: pd.DataFrame) -> AssetCheckResult:
+    """Verifica geocode construido, años 2021-2024, num_casos numérico y zonas presentes."""
+    nulos_geo = int(relacion_actividad_clean["geocode"].isna().sum())
+    años_ok = bool(set(relacion_actividad_clean["año"].unique()) >= {2021, 2022, 2023, 2024})
+    es_float = bool(relacion_actividad_clean["num_casos"].dtype in ["float64", "float32"])
+    zonas_ok = bool({"Zona volcán", "La Palma (resto)", "Resto provincia"}.issubset(
+        set(relacion_actividad_clean["zona"].unique())
+    ))
+    passed = bool(nulos_geo == 0 and años_ok and es_float and zonas_ok)
+    return AssetCheckResult(
+        passed=passed,
+        metadata={
+            "nulos_geocode": nulos_geo,
+            "años_completos": bool(años_ok),
+            "num_casos_float": bool(es_float),
+            "zonas_ok": bool(zonas_ok),
+        },
+    )
 
 
 @asset_check(asset=distribucion_clean)

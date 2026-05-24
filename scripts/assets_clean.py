@@ -60,7 +60,7 @@ def actividad_clean(actividad_raw: pd.DataFrame) -> pd.DataFrame:
 def rentamedia_clean(rentamedia_raw: pd.DataFrame) -> pd.DataFrame:
     df = rentamedia_raw.copy()
     df["municipio"] = df["municipio"].str.strip()
-    # TERRITORIO_CODE ya usa año+1 según la regla de la profesora (confirmado en exploración)
+    # TERRITORIO_CODE ya usa año+1
     # Ej: datos 2021 → TERRITORIO_CODE 20220101_... → join con secciones_20220101_tenerife.json
     df["geocode_join"] = df["TERRITORIO_CODE"]
     df["zona"] = df["municipio"].apply(
@@ -82,10 +82,6 @@ def distribucion_clean(distribucion_raw: pd.DataFrame) -> pd.DataFrame:
 
     # Extraer municipio desde TERRITORIO#es: "Distrito 01, Sección 001 - Arrecife" → "Arrecife"
     df["municipio"] = df["TERRITORIO#es"].str.extract(r"-\s+(.+)$")[0].str.strip()
-
-    # Sin desfase: el fichero etiquetado como año N contiene rentas del ejercicio N.
-    # El TERRITORIO_CODE con prefijo año+1 indica solo el GeoJSON de secciones a usar,
-    # no implica desfase en el año fiscal. Verificado empíricamente: pico COVID en fichero 2020.
     df["año"] = df["año_dato"]
 
     df["zona"] = df["municipio"].apply(_clasificar_zona_nombre)

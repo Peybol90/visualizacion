@@ -28,6 +28,7 @@ def distribucion_por_zona(distribucion_clean: pd.DataFrame) -> pd.DataFrame:
         distribucion_clean
         .groupby(["año", "zona", "MEDIDAS_CODE"])["pct"]
         .mean()
+        .round(1)
         .reset_index()
     )
     # Etiqueta legible para la leyenda
@@ -58,26 +59,16 @@ def actividad_zona_volcan(actividad_clean: pd.DataFrame) -> pd.DataFrame:
 
 
 @asset(group_name="analysis",
-       description="Acto 2: Construcción post-volcán — índice por municipio de La Palma (base 2021=100)")
+       description="Acto 2: Índice construcción por zona (base 2021=100)")
 def construccion_comparada(actividad_clean: pd.DataFrame) -> pd.DataFrame:
     df = actividad_clean[
-        (actividad_clean["es_lapalma"])
-        & (actividad_clean["actividad"] == "Construcción")
+        actividad_clean["actividad"] == "Construcción"
     ].copy()
-
-    agg = (
-        df.groupby(["año", "municipio", "zona"])["num_casos"]
-        .sum()
-        .reset_index()
-    )
-
-    # Índice base 2021 = 100 por municipio
-    base = agg[agg["año"] == 2021].set_index("municipio")["num_casos"]
-    # Solo municipios que tienen datos en 2021
-    municipios_validos = base[base > 0].index
-    agg = agg[agg["municipio"].isin(municipios_validos)].copy()
+    agg = df.groupby(["año", "zona"])["num_casos"].sum().reset_index()
+    base = agg[agg["año"] == 2021].set_index("zona")["num_casos"]
+    agg = agg[agg["zona"].isin(base.index)].copy()
     agg["indice"] = agg.apply(
-        lambda r: round(r["num_casos"] / base[r["municipio"]] * 100, 1), axis=1
+        lambda r: round(r["num_casos"] / base[r["zona"]] * 100, 1), axis=1
     )
     return agg
 
@@ -150,8 +141,4 @@ def tasa_paro_zona(relacion_actividad_clean: pd.DataFrame) -> pd.DataFrame:
     tasa.columns = ["año", "zona", "tasa_paro"]
     tasa["tasa_paro"] = tasa["tasa_paro"].round(1)
     return tasa
-    df = rentamedia_clean[
-        (rentamedia_clean["es_lapalma"])
-        & (rentamedia_clean["MEDIDAS_CODE"] == "RENTA_BRUTA_MEDIA_HOGAR")
-    ].copy()
-    return df[["año", "municipio", "seccion", "geocode_join", "OBS_VALUE", "zona"]]
+

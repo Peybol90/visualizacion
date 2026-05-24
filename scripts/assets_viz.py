@@ -11,7 +11,7 @@ from plotnine import (
     ggplot, aes, geom_col, geom_line, geom_point, geom_boxplot,
     geom_hline, geom_text, facet_wrap,
     scale_fill_manual, scale_color_manual, scale_x_continuous,
-    scale_y_continuous, scale_size_identity, coord_flip, theme_minimal, theme, labs,
+    scale_y_continuous, coord_flip, theme_minimal, theme, labs,
     element_text, element_blank, element_rect,
     position_dodge,
 )
@@ -33,10 +33,13 @@ PALETA_ZONA = {
 
 @asset(group_name="viz", description="Acto 1 – Renta media por zona 2021-2023 (líneas)")
 def viz_renta_por_zona(renta_por_zona: pd.DataFrame) -> str:
+    df = renta_por_zona.copy()
+    df["label"] = df["renta_media"].apply(lambda v: f"{int(round(v)):,}€".replace(",", "."))
     p = (
-        ggplot(renta_por_zona, aes(x="año", y="renta_media", color="zona", group="zona"))
+        ggplot(df, aes(x="año", y="renta_media", color="zona", group="zona"))
         + geom_line(size=1.2)
         + geom_point(size=3)
+        + geom_text(aes(label="label"), nudge_y=600, size=7)
         + scale_color_manual(values=PALETA_ZONA, name="Zona")
         + scale_x_continuous(breaks=[2021, 2022, 2023])
         + scale_y_continuous(labels=lambda lst: [f"{int(v):,}€" for v in lst])
@@ -88,60 +91,29 @@ def viz_actividad_zona_volcan(actividad_zona_volcan: pd.DataFrame) -> str:
     return path
 
 
-@asset(group_name="viz", description="Acto 2 – Índice de construcción por municipio de La Palma (base 2021=100)")
+@asset(group_name="viz", description="Acto 2 – Índice de construcción por zona (base 2021=100)")
 def viz_construccion_indice(construccion_comparada: pd.DataFrame) -> str:
-    import matplotlib.pyplot as plt
-    import matplotlib.colors as mcolors
-
-    df = construccion_comparada.copy()
-    muns_volcan = ["Paso, El", "Tazacorte", "Llanos de Aridane, Los"]
-
-    # Identificar top 3 municipios por índice en 2023
-    top3_2023 = (
-        df[df["año"] == 2023]
-        .nlargest(3, "indice")["municipio"]
-        .tolist()
-    )
-
-    # Etiquetas solo en 2023 para top3 y municipios volcán
-    etiquetar = set(top3_2023 + muns_volcan)
-    df_labels = df[(df["año"] == 2023) & (df["municipio"].isin(etiquetar))].copy()
-
-    # Paleta: volcán=rojos, top3=naranja, resto=azul claro uniforme
-    muns_resto = sorted([m for m in df["municipio"].unique() if m not in muns_volcan])
-    paleta = {m: "#B0C4DE" for m in muns_resto}  # azul claro uniforme para el fondo
-    for m in top3_2023:
-        if m not in muns_volcan:
-            paleta[m] = "#F4A261"  # naranja para top3 no volcán
-    paleta.update({
-        "Paso, El":     "#E63946",
-        "Tazacorte":    "#C1121F",
-        "Llanos de Aridane, Los": "#FF6B6B",
-    })
-
-    # Grosor: destacar top3 y volcán
-    df["grosor"] = df["municipio"].apply(
-        lambda m: 1.8 if m in etiquetar else 0.6
-    )
-
+    """
+    Gramática de gráficos:
+      data    = construccion_comparada (3 zonas)
+      mapping = x:año, y:indice, color:zona, group:zona
+      geom    = geom_line + geom_point + geom_text + geom_hline(100)
+      escala  = paleta narrativa (rojo volcán, azul La Palma, gris resto)
+    El índice base 100 permite comparar velocidad de recuperación
+    entre zonas con volúmenes absolutos muy distintos.
+    """
     p = (
-        ggplot(df, aes(x="año", y="indice", color="municipio", group="municipio",
-                       size="grosor"))
+        ggplot(construccion_comparada,
+               aes(x="año", y="indice", color="zona", group="zona"))
         + geom_hline(yintercept=100, linetype="dashed", color="#AAAAAA", size=0.8)
-        + geom_line()
-        + geom_point(data=df[df["municipio"].isin(etiquetar)], size=3)
-        + geom_text(
-            data=df_labels,
-            mapping=aes(label="municipio"),
-            nudge_x=0.05, nudge_y=1.5,
-            size=7, ha="left",
-        )
-        + scale_color_manual(values=paleta)
-        + scale_size_identity()
-        + scale_x_continuous(breaks=[2021, 2022, 2023], limits=[2020.8, 2023.8])
+        + geom_line(size=1.3)
+        + geom_point(size=4)
+        + geom_text(aes(label="indice"), nudge_y=2.5, size=8, color="#222222")
+        + scale_color_manual(values=PALETA_ZONA, name="Zona")
+        + scale_x_continuous(breaks=[2021, 2022, 2023])
         + labs(
-            title="Sector construcción por municipio · La Palma · Índice 2021 = 100",
-            subtitle="Top 3 en naranja · Zona volcán en rojo · Resto en azul",
+            title="Recuperación del sector construcción · Índice 2021 = 100",
+            subtitle="La reconstrucción post-volcán impulsa la construcción en toda La Palma",
             x="Año", y="Índice (2021 = 100)",
             caption="Fuente: INE – Censo de Población y Viviendas",
         )
@@ -149,11 +121,11 @@ def viz_construccion_indice(construccion_comparada: pd.DataFrame) -> str:
         + theme(
             plot_title=element_text(size=13, face="bold"),
             plot_subtitle=element_text(size=10, color="#555555"),
-            legend_position="none",
+            legend_position="bottom",
         )
     )
     path = f"{OUTPUT_DIR}/viz_04_construccion_indice.png"
-    p.save(path, dpi=150, width=11, height=6)
+    p.save(path, dpi=150, width=9, height=5)
     return path
 
 
@@ -175,14 +147,14 @@ def viz_desempleo_evolucion(distribucion_por_zona: pd.DataFrame) -> str:
         ggplot(df, aes(x="año", y="pct", color="zona", group="zona"))
         + geom_line(size=1.3)
         + geom_point(size=4)
-        + geom_text(aes(label="pct"), nudge_y=0.15, size=8)
+        + geom_text(aes(label="pct"), nudge_y=0.3, size=8)
         + scale_color_manual(values=PALETA_ZONA, name="Zona")
         + scale_x_continuous(breaks=[2019, 2020, 2021, 2022, 2023])
         + labs(
             title="% de renta procedente de prestaciones por desempleo · 2019-2023",
             subtitle="Evolución pre y post volcán Tajogaite",
             x="Año", y="% sobre renta total",
-            caption="Fuente: ISTAC – E30325A_000002  |  Volcán sept. 2021: impacto en prestaciones",
+            caption="Fuente: ISTAC – E30325A_000002",
         )
         + theme_minimal()
         + theme(
@@ -248,7 +220,7 @@ def viz_distribucion_volcan_cambio(distribucion_por_zona: pd.DataFrame) -> str:
             title="Fuentes de renta en la zona volcán: 2019 vs 2023",
             subtitle="Rentas 2018 (pre-volcán) vs rentas 2022 (post-volcán)",
             x="", y="% sobre renta total",
-            caption="Fuente: ISTAC – E30325A_000002  |  2019=pre-volcán, 2021=año volcán, 2023=post-volcán",
+            caption="Fuente: ISTAC – E30325A_000002",
         )
         + theme_minimal()
         + theme(
@@ -302,7 +274,13 @@ def viz_ocupados_origen(relacion_actividad_clean: pd.DataFrame) -> str:
     p = (
         ggplot(agg, aes(x="año", y="pct", fill="pais_nacimiento"))
         + geom_col(position=position_dodge(width=0.7), width=0.6)
-        + geom_text(aes(label="pct"), position=position_dodge(width=0.7), nudge_y=1, size=8)
+        + geom_text(
+            aes(label="pct"),
+            position=position_dodge(width=0.9),
+            va="bottom",
+            nudge_y=1,
+            size=8,
+        )
         + scale_fill_manual(
             values={"España": "#457B9D", "Extranjero": "#E63946"},
             name="País de nacimiento",
